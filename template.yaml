@@ -1,0 +1,6 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Stack base de prueba
+
+Resources:
+  DummyBucket:
+    Type: AWS::S3::Bucket
