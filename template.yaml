@@ -69,3 +69,4 @@ Resources:
       FunctionName: !Ref FileProcessorLambda
       BatchSize: 1
       Enabled: true
+      
