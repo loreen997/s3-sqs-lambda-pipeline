@@ -1,6 +1,76 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Stack base de prueba
+Description: S3 -> SQS -> Lambda pipeline
 
 Resources:
-  DummyBucket:
+
+  InputBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub s3-input-${AWS::AccountId}-${AWS::Region}
+
+  ProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: file-processing-queue
+
+  QueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref ProcessingQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt ProcessingQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt InputBucket.Arn
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: file-processor-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
+
+  FileProcessorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: file-processor
+      Runtime: python3.11
+      Handler: handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Sub lambda-artifacts-${AWS::AccountId}-${AWS::Region}
+        S3Key: function.zip
+      Timeout: 30
+
+  SQSToLambdaMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt ProcessingQueue.Arn
+      FunctionName: !Ref FileProcessorLambda
+      BatchSize: 1
+      Enabled: true
+
+  BucketNotification:
+    Type: AWS::S3::BucketNotification
+    DependsOn: QueuePolicy
+    Properties:
+      Bucket: !Ref InputBucket
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue: !GetAtt ProcessingQueue.Arn

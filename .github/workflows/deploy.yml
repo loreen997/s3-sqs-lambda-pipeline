@@ -1,4 +1,4 @@
-name: Deploy CloudFormation Stack
+name: Deploy S3-SQS-Lambda Pipeline
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  ARTIFACT_BUCKET: lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }}
 
 jobs:
   deploy:
@@ -21,20 +22,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Check secrets presence
+      - name: Create artifacts bucket (if not exists)
         run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
-            echo "AWS_ACCESS_KEY_ID is EMPTY"
-            exit 1
-          fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
-            echo "AWS_SECRET_ACCESS_KEY is EMPTY"
-            exit 1
-          fi
-          echo "Secrets are present"
+          aws s3 mb s3://lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }} || true
 
-      - name: Deploy stack
+      - name: Package Lambda
+        run: |
+          cd lambda
+          zip -r function.zip .
+
+      - name: Upload Lambda artifact
+        run: |
+          aws s3 cp lambda/function.zip \
+            s3://lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }}/function.zip
+
+      - name: Deploy CloudFormation stack
         run: |
           aws cloudformation deploy \
             --template-file template.yaml \
-            --stack-name s3-sqs-lambda-stack
+            --stack-name s3-sqs-lambda-stack \
+            --capabilities CAPABILITY_NAMED_IAM
