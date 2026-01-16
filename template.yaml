@@ -3,11 +3,6 @@ Description: S3 -> SQS -> Lambda pipeline
 
 Resources:
 
-  InputBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub s3-input-${AWS::AccountId}-${AWS::Region}
-
   ProcessingQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -28,7 +23,17 @@ Resources:
             Resource: !GetAtt ProcessingQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !GetAtt InputBucket.Arn
+                aws:SourceArn: !Sub arn:aws:s3:::s3-input-${AWS::AccountId}-${AWS::Region}
+
+  InputBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: QueuePolicy
+    Properties:
+      BucketName: !Sub s3-input-${AWS::AccountId}-${AWS::Region}
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue: !GetAtt ProcessingQueue.Arn
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -64,13 +69,3 @@ Resources:
       FunctionName: !Ref FileProcessorLambda
       BatchSize: 1
       Enabled: true
-
-  BucketNotification:
-    Type: AWS::S3::BucketNotification
-    DependsOn: QueuePolicy
-    Properties:
-      Bucket: !Ref InputBucket
-      NotificationConfiguration:
-        QueueConfigurations:
-          - Event: s3:ObjectCreated:*
-            Queue: !GetAtt ProcessingQueue.Arn
