@@ -6,7 +6,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ARTIFACT_BUCKET: lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }}
 
 jobs:
   deploy:
@@ -22,19 +21,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create artifacts bucket (if not exists)
+      - name: Create Lambda artifacts bucket (if not exists)
         run: |
-          aws s3 mb s3://lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }} || true
+          aws s3 mb s3://lambda-artifacts-${{ secrets.AWS_REGION }}-${{ github.repository_owner }} || true
 
       - name: Package Lambda
         run: |
           cd lambda
           zip -r function.zip .
 
-      - name: Upload Lambda artifact
+      - name: Upload Lambda package
         run: |
           aws s3 cp lambda/function.zip \
-            s3://lambda-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ secrets.AWS_REGION }}/function.zip
+            s3://lambda-artifacts-${{ secrets.AWS_REGION }}-${{ github.repository_owner }}/function.zip
 
       - name: Deploy CloudFormation stack
         run: |

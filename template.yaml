@@ -1,12 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 -> SQS -> Lambda pipeline
+Description: S3 -> SQS -> Lambda pipeline (CloudFormation)
 
 Resources:
 
   ProcessingQueue:
     Type: AWS::SQS::Queue
-    Properties:
-      QueueName: file-processing-queue
 
   QueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -38,7 +36,6 @@ Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: file-processor-lambda-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -53,7 +50,6 @@ Resources:
   FileProcessorLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: file-processor
       Runtime: python3.11
       Handler: handler.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -69,4 +65,3 @@ Resources:
       FunctionName: !Ref FileProcessorLambda
       BatchSize: 1
       Enabled: true
-      
